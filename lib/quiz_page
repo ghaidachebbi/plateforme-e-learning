@@ -1,0 +1,159 @@
+import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+class QuizPage extends StatefulWidget {
+  const QuizPage({super.key});
+
+  @override
+  _QuizPageState createState() => _QuizPageState();
+}
+
+class _QuizPageState extends State<QuizPage> {
+  int _score = 0;
+  int _currentQuestionIndex = 0;
+  List<Map<String, dynamic>> _questions = [];
+  String _selectedSubject = 'Mathématiques'; // Exemple de matière
+  int _difficultyLevel = 1; // Difficile par défaut
+  int _totalPoints = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadQuestions();
+  }
+
+  // Charger les questions en fonction de la matière et du niveau de difficulté
+  Future<void> _loadQuestions() async {
+    final subjectRef = FirebaseFirestore.instance
+        .collection('quiz')
+        .doc(_selectedSubject)
+        .collection('questions')
+        .where('difficulty', isEqualTo: _difficultyLevel)
+        .get();
+
+    final snapshot = await subjectRef;
+    if (snapshot.docs.isNotEmpty) {
+      setState(() {
+        _questions = snapshot.docs.map((doc) {
+          return {
+            'question': doc['question'],
+            'options': List<String>.from(doc['options']),
+            'answer': doc['answer'],
+          };
+        }).toList();
+      });
+    }
+  }
+
+  // Vérifier la réponse et passer à la question suivante
+  void _checkAnswer(String selectedAnswer) {
+    if (_questions[_currentQuestionIndex]['answer'] == selectedAnswer) {
+      setState(() {
+        _score += 10; // Gagner des points pour chaque bonne réponse
+        _totalPoints += 10;
+      });
+    }
+
+    if (_currentQuestionIndex < _questions.length - 1) {
+      setState(() {
+        _currentQuestionIndex++;
+      });
+    } else {
+      _submitScore();
+    }
+  }
+
+  // Soumettre le score et afficher le classement
+  Future<void> _submitScore() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final userRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
+      await userRef.update({
+        'quiz_score': FieldValue.increment(_score),
+        'total_points': FieldValue.increment(_totalPoints),
+      });
+
+      _showRanking();
+    }
+  }
+
+  // Afficher le classement
+  void _showRanking() async {
+    final rankingSnapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .orderBy('quiz_score', descending: true)
+        .limit(10)
+        .get();
+
+    List<String> rankingList = [];
+    rankingSnapshot.docs.forEach((doc) {
+      rankingList.add('${doc['username']} - ${doc['quiz_score']} points');
+    });
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Classement'),
+          content: SingleChildScrollView(
+            child: Column(
+              children: rankingList.map((rank) => Text(rank)).toList(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('Fermer'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Afficher les options de réponses
+  Widget _buildOptions() {
+    return Column(
+      children: _questions[_currentQuestionIndex]['options']
+          .map<Widget>((option) {
+        return ListTile(
+          title: Text(option),
+          onTap: () => _checkAnswer(option),
+        );
+      }).toList(),
+    );
+  }
+
+  // Page d'affichage du quiz
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Espace de Quiz Éducatif'),
+      ),
+      body: _questions.isEmpty
+          ? const Center(child: CircularProgressIndicator())
+          : Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Matière: $_selectedSubject', style: const TextStyle(fontSize: 18)),
+                  const SizedBox(height: 20),
+                  Text('Question ${_currentQuestionIndex + 1} / ${_questions.length}',
+                      style: const TextStyle(fontSize: 16)),
+                  const SizedBox(height: 20),
+                  Text(_questions[_currentQuestionIndex]['question'], style: const TextStyle(fontSize: 18)),
+                  const SizedBox(height: 20),
+                  _buildOptions(),
+                  const SizedBox(height: 20),
+                  Text('Score actuel: $_score', style: const TextStyle(fontSize: 16)),
+                ],
+              ),
+            ),
+    );
+  }
+}

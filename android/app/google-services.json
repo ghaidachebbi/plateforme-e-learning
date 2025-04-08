@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "960250063126",
+    "project_id": "ghaida-2a717",
+    "storage_bucket": "ghaida-2a717.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:960250063126:android:4d7477f5fd9066142c0837",
+        "android_client_info": {
+          "package_name": "com.example.application"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA-uccYHvuKPsy1NwKhCXH6KM7VmbV99xM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
